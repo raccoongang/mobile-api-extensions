@@ -1,0 +1,10 @@
+-c constraints.txt
+-r base.txt
+
+pycodestyle
+pylint==2.5.3
+pytest
+pytest-cov
+pytest-stub
+pytest-mock
+mock
