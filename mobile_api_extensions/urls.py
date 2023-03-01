@@ -13,8 +13,16 @@ Including another URLconf
     1. Import the include() function: from django.conf.urls import url, include
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
-# pylint: disable=unused-import
-from django.conf.urls import url
-from django.contrib import admin
+from django.conf import settings
+from django.urls import re_path
 
-urlpatterns = []
+from .api import UserCourseEnrollmentsListExtended
+
+
+urlpatterns = [
+    re_path(
+        r'^(?P<api_version>v(1|0.5))/users/' + settings.USERNAME_PATTERN + '/course_enrollments/$',
+        UserCourseEnrollmentsListExtended.as_view(),
+        name='courseenrollment-detail'
+    ),
+]
