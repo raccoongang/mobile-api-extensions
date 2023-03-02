@@ -1,9 +1,16 @@
 """
 Views for user API
 """
-
+from django.contrib.auth import get_user_model
 from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
+from lms.djangoapps.discussion.rest_api.views import CommentViewSet
+from lms.djangoapps.discussion.rest_api.api import create_comment
+from rest_framework.response import Response
+from openedx.core.djangoapps.user_api.accounts.serializers import AccountLegacyProfileSerializer
+
+
+User = get_user_model()
 
 
 class UserCourseEnrollmentsListExtended(UserCourseEnrollmentsList):
@@ -75,3 +82,99 @@ class UserCourseEnrollmentsListExtended(UserCourseEnrollmentsList):
             * url: URL to the downloadable version of the certificate, if exists.
     """
     pagination_class = DefaultPagination
+
+
+class CommentViewSetExtended(CommentViewSet):
+    """
+    **POST Parameters**:
+
+        * thread_id (required): The thread to post the comment in
+
+        * parent_id: The parent comment of the new comment. Can be null or
+          omitted for a comment that should be directly under the thread
+
+        * raw_body: The comment's raw body text
+
+        * anonymous (optional): A boolean indicating whether the comment is
+        anonymous; defaults to false
+
+        * anonymous_to_peers (optional): A boolean indicating whether the
+        comment is anonymous to peers; defaults to false
+
+    **POST Response Values**:
+
+        * id: The id of the comment
+
+        * thread_id: The id of the comment's thread
+
+        * parent_id: The id of the comment's parent
+
+        * author: The username of the comment's author, or None if the
+          comment is anonymous
+
+        * author_label: A label indicating whether the author has a special
+          role in the course, either "Staff" for moderators and
+          administrators or "Community TA" for community TAs
+
+        * created_at: The ISO 8601 timestamp for the creation of the comment
+
+        * updated_at: The ISO 8601 timestamp for the last modification of
+            the comment, which may not have been an update of the body
+
+        * raw_body: The comment's raw body text without any rendering applied
+
+        * endorsed: Boolean indicating whether the comment has been endorsed
+            (by a privileged user or, for a question thread, the thread
+            author)
+
+        * endorsed_by: The username of the endorsing user, if available
+
+        * endorsed_by_label: A label indicating whether the endorsing user
+            has a special role in the course (see author_label)
+
+        * endorsed_at: The ISO 8601 timestamp for the endorsement, if
+            available
+
+        * abuse_flagged: Boolean indicating whether the requesting user has
+          flagged the comment for abuse
+
+        * abuse_flagged_any_user: Boolean indicating whether any user has
+            flagged the comment for abuse. Returns null if requesting user
+            is not a moderator.
+
+        * voted: Boolean indicating whether the requesting user has voted
+          for the comment
+
+        * vote_count: The number of votes for the comment
+
+        * children: The list of child comments (with the same format)
+
+        * editable_fields: The fields that the requesting user is allowed to
+            modify with a PATCH request
+
+        * anonymous: A boolean indicating whether the comment is anonymous
+
+        * anonymous_to_peers: A boolean indicating whether the comment is
+        anonymous to peers
+
+        * profile_image: Metadata about a user's profile image
+    """
+
+    def create(self, request):
+        """
+        Implements the POST method for the list endpoint as described in the
+        class docstring.
+        """
+        data = create_comment(request, request.data)
+        extended_data = {
+            'profile_image': {},
+        }
+
+        if hasattr(request.user, 'profile'):
+            extended_data.update({
+                'profile_image': AccountLegacyProfileSerializer.get_profile_image(
+                    request.user.profile, request.user, request)
+            })
+
+        data.update(extended_data)
+        return Response(data)
