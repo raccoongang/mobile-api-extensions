@@ -14,10 +14,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf import settings
-from django.urls import re_path, include
+from django.urls import include, path, re_path
 from rest_framework.routers import SimpleRouter
 
-from .api import UserCourseEnrollmentsListExtended, CommentViewSetExtended
+from .api import (
+    BlocksInCourseViewExtended,
+    CommentViewSetExtended,
+    UserCourseEnrollmentsListExtended
+)
 
 ROUTER = SimpleRouter()
 ROUTER.register("comments", CommentViewSetExtended, basename="comment-extended")
@@ -29,4 +33,15 @@ urlpatterns = [
         name='courseenrollment-detail'
     ),
     re_path(r'^discussion/v1/', include(ROUTER.urls)),
+    path(
+        'v1/blocks/',
+        BlocksInCourseViewExtended.as_view(),
+        kwargs={'hide_access_denials': True},
+        name="blocks_in_course"
+    ),
+    path(
+        'v2/blocks/',
+        BlocksInCourseViewExtended.as_view(),
+        name="blocks_in_course"
+    ),
 ]

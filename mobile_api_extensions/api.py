@@ -3,11 +3,16 @@ Views for user API
 """
 from django.contrib.auth import get_user_model
 from edx_rest_framework_extensions.paginators import DefaultPagination
-from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
-from lms.djangoapps.discussion.rest_api.views import CommentViewSet
+from lms.djangoapps.certificates.api import certificate_downloadable_status
+from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
+from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.discussion.rest_api.api import create_comment
-from rest_framework.response import Response
+from lms.djangoapps.discussion.rest_api.views import CommentViewSet
+from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
+from opaque_keys.edx.keys import CourseKey
+from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.user_api.accounts.serializers import AccountLegacyProfileSerializer
+from rest_framework.response import Response
 
 
 User = get_user_model()
@@ -178,3 +183,103 @@ class CommentViewSetExtended(CommentViewSet):
 
         data.update(extended_data)
         return Response(data)
+
+
+class BlocksInCourseViewExtended(BlocksInCourseView):
+    """
+    **Use Case**
+
+        Returns the blocks in the course according to the requesting user's
+        access level.
+
+    **Example requests**:
+
+        GET /api/courses/v1/blocks/?course_id=<course_id>
+        GET /api/courses/v1/blocks/?course_id=<course_id>
+            &username=anjali
+            &depth=all
+            &requested_fields=graded,format,student_view_multi_device,lti_url
+            &block_counts=video
+            &student_view_data=video
+            &block_types_filter=problem,html
+
+    **Parameters**:
+
+        This view redirects to /api/courses/v1/blocks/<root_usage_key>/ for the
+        root usage key of the course specified by course_id.  The view accepts
+        all parameters accepted by :class:`BlocksView`, plus the following
+        required parameter
+
+        * course_id: (string, required) The ID of the course whose block data
+          we want to return
+
+    **Response Values**
+
+        Responses are identical to those returned by :class:`BlocksView` when
+        passed the root_usage_key of the requested course.
+
+        If the course_id is not supplied, a 400: Bad Request is returned, with
+        a message indicating that course_id is required.
+
+        If an invalid course_id is supplied, a 400: Bad Request is returned,
+        with a message indicating that the course_id is not valid.
+    """
+
+    def get_certificate(self, request, user, course_id):
+        """Returns the information about the user's certificate in the course."""
+        certificate_info = certificate_downloadable_status(user, course_id)
+        if certificate_info['is_downloadable']:
+            return {
+                'url': request.build_absolute_uri(
+                    certificate_info['download_url']
+                ),
+            }
+        else:
+            return {}
+
+    def list(self, request, hide_access_denials=False):  # pylint: disable=arguments-differ
+        """
+        Retrieves the usage_key for the requested course, and then returns the
+        same information that would be returned by BlocksView.list, called with
+        that usage key
+
+        Arguments:
+            request - Django request object
+        """
+        response = super().list(request,
+                                hide_access_denials=hide_access_denials)
+
+        course_id = request.query_params.get('course_id', None)
+        course_key = CourseKey.from_string(course_id)
+        course_overview = CourseOverview.get_from_id(course_key)
+
+        course_data = {
+            # identifiers
+            'id': course_id,
+            'name': course_overview.display_name,
+            'number': course_overview.display_number_with_default,
+            'org': course_overview.display_org_with_default,
+
+            # dates
+            'start': course_overview.start,
+            'start_display': course_overview.start_display,
+            'start_type': course_overview.start_type,
+            'end': course_overview.end,
+
+            # access info
+            'courseware_access': has_access(
+                request.user,
+                'load_mobile',
+                course_overview
+            ).to_json(),
+
+            # various URLs
+            'media': {
+                'image': course_overview.image_urls,
+            },
+            'certificate': self.get_certificate(request, request.user, course_key),
+            'is_self_paced': course_overview.self_paced
+        }
+
+        response.data.update(course_data)
+        return response
