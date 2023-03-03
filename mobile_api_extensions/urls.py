@@ -16,11 +16,13 @@ Including another URLconf
 from django.conf import settings
 from django.urls import include, path, re_path
 from rest_framework.routers import SimpleRouter
+from common.djangoapps.util.views import ensure_valid_course_key
 
 from .api import (
     BlocksInCourseViewExtended,
     CommentViewSetExtended,
-    UserCourseEnrollmentsListExtended
+    UserCourseEnrollmentsListExtended,
+    CourseProgressView
 )
 
 ROUTER = SimpleRouter()
@@ -44,4 +46,7 @@ urlpatterns = [
         BlocksInCourseViewExtended.as_view(),
         name="blocks_in_course"
     ),
+    re_path(r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
+        ensure_valid_course_key(CourseProgressView.as_view()),
+        name='api-course-progress'),
 ]

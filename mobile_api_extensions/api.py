@@ -6,16 +6,58 @@ from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.certificates.api import certificate_downloadable_status
 from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
 from lms.djangoapps.courseware.access import has_access
+from lms.djangoapps.courseware.courses import get_course_with_access
 from lms.djangoapps.discussion.rest_api.api import create_comment
 from lms.djangoapps.discussion.rest_api.views import CommentViewSet
+from lms.djangoapps.grades.course_grade_factory import CourseGradeFactory
 from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.user_api.accounts.serializers import AccountLegacyProfileSerializer
+from openedx.core.lib.api.view_utils import view_auth_classes
 from rest_framework.response import Response
-
+from rest_framework.views import APIView
 
 User = get_user_model()
+
+
+@view_auth_classes()
+class CourseProgressView(APIView):
+
+    def get(self, request, course_id):
+        course_key = CourseKey.from_string(course_id)
+        course = get_course_with_access(request.user, 'load', course_key)
+
+        course_grade = CourseGradeFactory().read(request.user, course)
+        courseware_summary = course_grade.chapter_grades.values()
+
+        progress_data = []
+
+        staff_access = bool(has_access(request.user, 'staff', course))
+
+        for chapter in courseware_summary:
+            chapter_data = {
+                'display_name': chapter['display_name'],
+                'subsections': []
+            }
+
+            for section in chapter['sections']:
+                earned = section.all_total.earned
+                total = section.all_total.possible
+                section_data = dict(
+                    earned=earned,
+                    total=total,
+                    percentageString="{0:.0%}".format(section.percent_graded),
+                    display_name=section.display_name,
+                    score=[{'earned': score.earned, 'possible': score.possible} for score in section.problem_scores.values()],
+                    show_grades=section.show_grades(staff_access),
+                    graded=section.graded,
+                    grade_type=section.format or '',
+                )
+                chapter_data['subsections'].append(section_data)
+
+            progress_data.append(chapter_data)
+        return Response({'sections': progress_data})
 
 
 class UserCourseEnrollmentsListExtended(UserCourseEnrollmentsList):
