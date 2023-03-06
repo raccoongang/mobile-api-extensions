@@ -1,10 +1,12 @@
 """
 Views for user API
 """
+from common.djangoapps.student.models import CourseEnrollment
 from django.contrib.auth import get_user_model
 from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.certificates.api import certificate_downloadable_status
 from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
+from lms.djangoapps.course_api.views import CourseDetailView
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import get_course_with_access
 from lms.djangoapps.discussion.rest_api.api import create_comment
@@ -324,4 +326,97 @@ class BlocksInCourseViewExtended(BlocksInCourseView):
         }
 
         response.data.update(course_data)
+        return response
+
+class CourseDetailViewExtended(CourseDetailView):
+    """
+    **Use Cases**
+
+        Request details for a course
+
+    **Example Requests**
+
+        GET /mobile_api_extensions/v1/courses/{course_key}/
+
+    **Response Values**
+
+        Body consists of the following fields:
+
+        * effort: A textual description of the weekly hours of effort expected
+            in the course.
+        * end: Date the course ends, in ISO 8601 notation
+        * enrollment_end: Date enrollment ends, in ISO 8601 notation
+        * enrollment_start: Date enrollment begins, in ISO 8601 notation
+        * id: A unique identifier of the course; a serialized representation
+            of the opaque key identifying the course.
+        * media: An object that contains named media items.  Included here:
+            * course_image: An image to show for the course.  Represented
+            as an object with the following fields:
+                * uri: The location of the image
+        * name: Name of the course
+        * number: Catalog number of the course
+        * org: Name of the organization that owns the course
+        * overview: A possibly verbose HTML textual description of the course.
+            Note: this field is only included in the Course Detail view, not
+            the Course List view.
+        * short_description: A textual description of the course
+        * start: Date the course begins, in ISO 8601 notation
+        * start_display: Readably formatted start of the course
+        * start_type: Hint describing how `start_display` is set. One of:
+            * `"string"`: manually set by the course author
+            * `"timestamp"`: generated from the `start` timestamp
+            * `"empty"`: no start date is specified
+        * pacing: Course pacing. Possible values: instructor, self
+
+        Deprecated fields:
+
+        * blocks_url: Used to fetch the course blocks
+        * course_id: Course key (use 'id' instead)
+
+    **Parameters:**
+
+        username (optional):
+            The username of the specified user for whom the course data
+            is being accessed. The username is not only required if the API is
+            requested by an Anonymous user.
+
+    **Returns**
+
+        * 200 on success with above fields.
+        * 400 if an invalid parameter was sent or the username was not provided
+        for an authenticated request.
+        * 403 if a user who does not have permission to masquerade as
+        another user specifies a username other than their own.
+        * 404 if the course is not available or cannot be seen.
+
+        Example response:
+
+            {
+                "blocks_url": "/api/courses/v1/blocks/?course_id=edX%2Fexample%2F2012_Fall",
+                "media": {
+                    "course_image": {
+                        "uri": "/c4x/edX/example/asset/just_a_test.jpg",
+                        "name": "Course Image"
+                    }
+                },
+                "description": "An example course.",
+                "end": "2015-09-19T18:00:00Z",
+                "enrollment_end": "2015-07-15T00:00:00Z",
+                "enrollment_start": "2015-06-15T00:00:00Z",
+                "course_id": "edX/example/2012_Fall",
+                "name": "Example Course",
+                "number": "example",
+                "org": "edX",
+                "overview: "<p>A verbose description of the course.</p>"
+                "start": "2015-07-17T12:00:00Z",
+                "start_display": "July 17, 2015",
+                "start_type": "timestamp",
+                "pacing": "instructor"
+                "is_enrolled": true
+            }
+    """
+
+    def get(self, request, course_key_string):
+        response = super().get(request, course_key_string)
+        response.data['is_enrolled'] = CourseEnrollment.is_enrolled(request.user, course_key_string)
         return response

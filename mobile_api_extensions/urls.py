@@ -22,7 +22,8 @@ from .api import (
     BlocksInCourseViewExtended,
     CommentViewSetExtended,
     UserCourseEnrollmentsListExtended,
-    CourseProgressView
+    CourseDetailViewExtended,
+    CourseProgressView,
 )
 
 ROUTER = SimpleRouter()
@@ -48,5 +49,10 @@ urlpatterns = [
     ),
     re_path(r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
         ensure_valid_course_key(CourseProgressView.as_view()),
-        name='api-course-progress'),
+        name='api-course-progress'
+    ),
+    re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}',
+        CourseDetailViewExtended.as_view(),
+        name="course-detail"
+    ),
 ]
