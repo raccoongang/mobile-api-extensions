@@ -3,14 +3,15 @@ Views for user API
 """
 from common.djangoapps.student.models import CourseEnrollment
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.certificates.api import certificate_downloadable_status
 from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
-from lms.djangoapps.course_api.views import CourseDetailView
+from lms.djangoapps.course_api.views import CourseDetailView, CourseListView
+from lms.djangoapps.course_api.forms import CourseListGetForm
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import get_course_with_access
-from lms.djangoapps.discussion.rest_api.api import create_comment
 from lms.djangoapps.discussion.rest_api.views import CommentViewSet
 from lms.djangoapps.grades.course_grade_factory import CourseGradeFactory
 from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
@@ -23,6 +24,8 @@ from openedx.core.lib.api.view_utils import view_auth_classes
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from .utils import list_courses
+
 
 User = get_user_model()
 
@@ -139,6 +142,14 @@ class UserCourseEnrollmentsListExtended(UserCourseEnrollmentsList):
 
 class CommentViewSetExtended(CommentViewSet):
     """
+    **Example Requests**:
+
+        POST /mobile_api_extensions/discussion/v1/comments/
+        {
+            "thread_id": "0123456789abcdef01234567",
+            "raw_body": "Body text"
+        }
+
     **POST Parameters**:
 
         * thread_id (required): The thread to post the comment in
@@ -218,7 +229,7 @@ class CommentViewSetExtended(CommentViewSet):
         Implements the POST method for the list endpoint as described in the
         class docstring.
         """
-        data = create_comment(request, request.data)
+        response = super().create(request)
         extended_data = {
             'profile_image': {},
         }
@@ -229,8 +240,8 @@ class CommentViewSetExtended(CommentViewSet):
                     request.user.profile, request.user, request)
             })
 
-        data.update(extended_data)
-        return Response(data)
+        response.data.update(extended_data)
+        return response
 
 
 class BlocksInCourseViewExtended(BlocksInCourseView):
@@ -331,6 +342,7 @@ class BlocksInCourseViewExtended(BlocksInCourseView):
 
         response.data.update(course_data)
         return response
+
 
 class CourseDetailViewExtended(CourseDetailView):
     """
@@ -462,3 +474,94 @@ class DeactivateLogoutViewExtended(DeactivateLogoutView):
     """
 
     authentication_classes = (JwtAuthentication, SessionAuthentication, BearerAuthentication,)
+
+
+@view_auth_classes(is_authenticated=False)
+class CourseListViewExtended(CourseListView):
+    """
+    **Use Cases**
+
+        Request information on all courses visible to the specified user.
+
+    **Example Requests**
+
+        GET /mobile_api_extensions/courses/v1/courses/
+
+    **Response Values**
+
+        Body comprises a list of objects as returned by `CourseDetailView`.
+
+    **Parameters**
+
+        search_term (optional):
+            Search term to filter courses (used by ElasticSearch).
+
+        username (optional):
+            The username of the specified user whose visible courses we
+            want to see. The username is not required only if the API is
+            requested by an Anonymous user.
+
+        org (optional):
+            If specified, visible `CourseOverview` objects are filtered
+            such that only those belonging to the organization with the
+            provided org code (e.g., "HarvardX") are returned.
+            Case-insensitive.
+
+        permissions (optional):
+            If specified, it filters visible `CourseOverview` objects by
+            checking if each permission specified is granted for the username.
+            Notice that Staff users are always granted permission to list any
+            course.
+
+    **Returns**
+
+        * 200 on success, with a list of course discovery objects as returned
+          by `CourseDetailView`.
+        * 400 if an invalid parameter was sent or the username was not provided
+          for an authenticated request.
+        * 403 if a user who does not have permission to masquerade as
+          another user specifies a username other than their own.
+        * 404 if the specified user does not exist, or the requesting user does
+          not have permission to view their courses.
+
+        Example response:
+
+            [
+              {
+                "blocks_url": "/api/courses/v1/blocks/?course_id=edX%2Fexample%2F2012_Fall",
+                "media": {
+                  "course_image": {
+                    "uri": "/c4x/edX/example/asset/just_a_test.jpg",
+                    "name": "Course Image"
+                  }
+                },
+                "description": "An example course.",
+                "end": "2015-09-19T18:00:00Z",
+                "enrollment_end": "2015-07-15T00:00:00Z",
+                "enrollment_start": "2015-06-15T00:00:00Z",
+                "course_id": "edX/example/2012_Fall",
+                "name": "Example Course",
+                "number": "example",
+                "org": "edX",
+                "start": "2015-07-17T12:00:00Z",
+                "start_display": "July 17, 2015",
+                "start_type": "timestamp"
+              }
+            ]
+    """
+
+    def get_queryset(self):
+        """
+        Yield courses visible to the user.
+        """
+        form = CourseListGetForm(self.request.query_params, initial={'requesting_user': self.request.user})
+        if not form.is_valid():
+            raise ValidationError(form.errors)
+        return list_courses(
+            self.request,
+            form.cleaned_data['username'],
+            org=form.cleaned_data['org'],
+            filter_=form.cleaned_data['filter_'],
+            search_term=form.cleaned_data['search_term'],
+            permissions=form.cleaned_data['permissions']
+        )

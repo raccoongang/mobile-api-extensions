@@ -1,17 +1,5 @@
-"""mobile_api_extensions URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/3.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  url(r'^$', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  url(r'^$', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.conf.urls import url, include
-    2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
+"""
+mobile_api_extensions URL Configuration
 """
 from django.conf import settings
 from django.urls import include, path, re_path
@@ -23,12 +11,14 @@ from .api import (
     CommentViewSetExtended,
     UserCourseEnrollmentsListExtended,
     CourseDetailViewExtended,
+    CourseListViewExtended,
     CourseProgressView,
     DeactivateLogoutViewExtended,
 )
 
 ROUTER = SimpleRouter()
 ROUTER.register("comments", CommentViewSetExtended, basename="comment-extended")
+
 
 urlpatterns = [
     re_path(
@@ -51,6 +41,11 @@ urlpatterns = [
     re_path(r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
         ensure_valid_course_key(CourseProgressView.as_view()),
         name='api-course-progress'
+    ),
+    path(
+        'courses/v1/courses/',
+        CourseListViewExtended.as_view(),
+        name="course-list"
     ),
     re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}',
         CourseDetailViewExtended.as_view(),
