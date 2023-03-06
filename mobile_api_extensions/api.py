@@ -3,6 +3,7 @@ Views for user API
 """
 from common.djangoapps.student.models import CourseEnrollment
 from django.contrib.auth import get_user_model
+from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.certificates.api import certificate_downloadable_status
 from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
@@ -16,7 +17,10 @@ from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.user_api.accounts.serializers import AccountLegacyProfileSerializer
+from openedx.core.djangoapps.user_api.accounts.views import DeactivateLogoutView
+from openedx.core.lib.api.authentication import BearerAuthentication
 from openedx.core.lib.api.view_utils import view_auth_classes
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -238,8 +242,8 @@ class BlocksInCourseViewExtended(BlocksInCourseView):
 
     **Example requests**:
 
-        GET /api/courses/v1/blocks/?course_id=<course_id>
-        GET /api/courses/v1/blocks/?course_id=<course_id>
+        GET /mobile_api_extensions/v1/blocks/?course_id=<course_id>
+        GET /mobile_api_extensions/v1/blocks/?course_id=<course_id>
             &username=anjali
             &depth=all
             &requested_fields=graded,format,student_view_multi_device,lti_url
@@ -249,7 +253,7 @@ class BlocksInCourseViewExtended(BlocksInCourseView):
 
     **Parameters**:
 
-        This view redirects to /api/courses/v1/blocks/<root_usage_key>/ for the
+        This view redirects to /mobile_api_extensions/v1/blocks/<root_usage_key>/ for the
         root usage key of the course specified by course_id.  The view accepts
         all parameters accepted by :class:`BlocksView`, plus the following
         required parameter
@@ -367,6 +371,7 @@ class CourseDetailViewExtended(CourseDetailView):
             * `"timestamp"`: generated from the `start` timestamp
             * `"empty"`: no start date is specified
         * pacing: Course pacing. Possible values: instructor, self
+        * is_enrolled: A boolean indicating whether the user enrolled in a course.
 
         Deprecated fields:
 
@@ -420,3 +425,40 @@ class CourseDetailViewExtended(CourseDetailView):
         response = super().get(request, course_key_string)
         response.data['is_enrolled'] = CourseEnrollment.is_enrolled(request.user, course_key_string)
         return response
+
+
+class DeactivateLogoutViewExtended(DeactivateLogoutView):
+    """
+    POST /mobile_api_extensions/user/v1/accounts/deactivate_logout/
+    {
+        "password": "example_password",
+    }
+
+    **POST Parameters**
+
+      A POST request must include the following parameter.
+
+      * password: Required. The current password of the user being deactivated.
+
+    **POST Response Values**
+
+     If the request does not specify a username or submits a username
+     for a non-existent user, the request returns an HTTP 404 "Not Found"
+     response.
+
+     If a user who is not a superuser tries to deactivate a user,
+     the request returns an HTTP 403 "Forbidden" response.
+
+     If the specified user is successfully deactivated, the request
+     returns an HTTP 204 "No Content" response.
+
+     If an unanticipated error occurs, the request returns an
+     HTTP 500 "Internal Server Error" response.
+
+    Allows an LMS user to take the following actions:
+    -  Change the user's password permanently to Django's unusable password
+    -  Log the user out
+    - Create a row in the retirement table for that user
+    """
+
+    authentication_classes = (JwtAuthentication, SessionAuthentication, BearerAuthentication,)

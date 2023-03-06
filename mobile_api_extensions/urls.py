@@ -24,6 +24,7 @@ from .api import (
     UserCourseEnrollmentsListExtended,
     CourseDetailViewExtended,
     CourseProgressView,
+    DeactivateLogoutViewExtended,
 )
 
 ROUTER = SimpleRouter()
@@ -54,5 +55,9 @@ urlpatterns = [
     re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}',
         CourseDetailViewExtended.as_view(),
         name="course-detail"
+    ),
+    path(
+        'user/v1/accounts/deactivate_logout/', DeactivateLogoutViewExtended.as_view(),
+        name='deactivate_logout'
     ),
 ]
