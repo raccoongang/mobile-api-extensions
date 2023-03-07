@@ -47,7 +47,7 @@ urlpatterns = [
         CourseListViewExtended.as_view(),
         name="course-list"
     ),
-    re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}',
+    re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}$',
         CourseDetailViewExtended.as_view(),
         name="course-detail"
     ),
