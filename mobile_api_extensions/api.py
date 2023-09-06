@@ -563,5 +563,5 @@ class CourseListViewExtended(CourseListView):
             org=form.cleaned_data['org'],
             filter_=form.cleaned_data['filter_'],
             search_term=form.cleaned_data['search_term'],
-            permissions=form.cleaned_data['permissions']
+            permissions=form.cleaned_data.get('permissions', None)
         )
