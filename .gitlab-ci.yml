@@ -1,0 +1,126 @@
+image: docker:stable
+
+stages:
+  - build-base
+  - build-test
+  - linting
+  - testing
+  - versions
+  - build-box
+  - pypi
+  - cleanup
+
+variables:
+    BASE_IMAGE: $CI_REGISTRY_IMAGE:mobile_api_extensions-mobile_api_extensions
+    TEST_IMAGE: $CI_REGISTRY_IMAGE:mobile_api_extensions-mobile_api_extensions-test
+    BUILD_BOX_IMAGE: $CI_REGISTRY_IMAGE:mobile_api_extensions-mobile_api_extensions-build
+    STYLELINTRC_PATH: https://raw.githubusercontent.com/raccoongang/frontend/master/.stylelintrc
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+
+services:
+  - docker:stable-dind
+
+build-box:
+  stage: build-box
+  script:
+    - docker pull $BASE_IMAGE || true
+    - docker build --cache-from $BASE_IMAGE -t $BUILD_BOX_IMAGE --target=build-box .
+    - docker push $BUILD_BOX_IMAGE
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build-base:
+  stage: build-base
+  script:
+    - docker pull $BASE_IMAGE || true
+    - docker build --cache-from $BASE_IMAGE -t $BASE_IMAGE --target=base-image .
+    - docker push $BASE_IMAGE
+  resource_group: build
+  only:
+    refs:
+      - main
+      - merge_requests
+    changes:
+      - Dockerfile
+      - .gitlab-ci.yml
+
+build-test:
+  stage: build-test
+  script:
+    - docker pull $BASE_IMAGE
+    - docker pull $TEST_IMAGE || true
+    - docker build --cache-from $BASE_IMAGE --cache-from $TEST_IMAGE -t $TEST_IMAGE --target=test-image .
+    - docker push $TEST_IMAGE
+  resource_group: build
+  only:
+    refs:
+      - main
+      - merge_requests
+    changes:
+      - Dockerfile
+      - requirements/test.txt
+      - .gitlab-ci.yml
+
+.test:
+  stage: testing
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker pull $TEST_IMAGE
+  only:
+    - main
+    - merge_requests
+
+pytest:
+  extends: .test
+  script:
+    - docker run --rm -v ${PWD}:/app $TEST_IMAGE make python-test
+  coverage: "/TOTAL.+ ([0-9]{1,3}%)/"
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+quality:
+  extends: .test
+  stage: linting
+  script:
+    - docker run --rm -v ${PWD}:/app $TEST_IMAGE make quality
+
+stylelint:
+  stage: linting
+  image: pipelinecomponents/stylelint:0.9.0
+  before_script:
+    - apk add --update curl && rm -rf /var/cache/apk/*
+    - curl $STYLELINTRC_PATH > .stylelintrc
+  script:
+    - stylelint '**/*.scss' --config .stylelintrc --allow-empty-input
+  only:
+    - main
+    - merge_requests
+
+check_tag_version:
+  stage: versions
+  image: python:3.8
+  before_script:
+    - ''
+  script:
+    - python check_version.py
+  rules:
+    - if: $CI_COMMIT_TAG
+
+pypi_build_and_publish:
+  stage: pypi
+  script:
+    - docker run --rm -v ${PWD}:/app -e CI_JOB_TOKEN -e CI_PROJECT_ID -e CI_API_V4_URL $BUILD_BOX_IMAGE make pypi
+  rules:
+    - if: $CI_COMMIT_TAG
+
+clean_up:
+  stage: cleanup
+  script:
+    - docker rmi -f $BUILD_BOX_IMAGE || true
+  rules:
+    - if: $CI_COMMIT_TAG
