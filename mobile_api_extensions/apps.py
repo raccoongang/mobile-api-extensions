@@ -63,3 +63,6 @@ class MobileApiExtensionsConfig(AppConfig):
             },
         }
     }
+
+    def ready(self):
+        from . import signals  # pylint: disable=unused-variable
