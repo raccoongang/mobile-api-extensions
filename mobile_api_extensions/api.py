@@ -1,31 +1,43 @@
 """
 Views for user API
 """
+from __future__ import unicode_literals
+
+import json
+
 from common.djangoapps.student.models import CourseEnrollment
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.test import RequestFactory
+from django.urls import reverse
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from edx_rest_framework_extensions.paginators import DefaultPagination
 from lms.djangoapps.certificates.api import certificate_downloadable_status
 from lms.djangoapps.course_api.blocks.views import BlocksInCourseView
-from lms.djangoapps.course_api.views import CourseDetailView, CourseListView
 from lms.djangoapps.course_api.forms import CourseListGetForm
+from lms.djangoapps.course_api.views import CourseDetailView, CourseListView
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.courseware.courses import get_course_with_access
+from lms.djangoapps.courseware.module_render import _invoke_xblock_handler
 from lms.djangoapps.discussion.rest_api.views import CommentViewSet
 from lms.djangoapps.grades.course_grade_factory import CourseGradeFactory
+from lms.djangoapps.mobile_api.decorators import mobile_view
 from lms.djangoapps.mobile_api.users.views import UserCourseEnrollmentsList
+from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 from openedx.core.djangoapps.user_api.accounts.serializers import AccountLegacyProfileSerializer
 from openedx.core.djangoapps.user_api.accounts.views import DeactivateLogoutView
 from openedx.core.lib.api.authentication import BearerAuthentication
 from openedx.core.lib.api.view_utils import view_auth_classes
+from rest_framework import status, views
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .utils import list_courses
+from xmodule.modulestore.django import modulestore
+from xmodule.modulestore.exceptions import ItemNotFoundError
 
+from .utils import list_courses
 
 User = get_user_model()
 
@@ -570,3 +582,47 @@ class CourseListViewExtended(CourseListView):
             search_term=form.cleaned_data['search_term'],
             permissions=form.cleaned_data.get('permissions', None)
         )
+
+
+@mobile_view()
+class SyncXBlockData(views.APIView):
+
+    def post(self, request, formating=None):
+        # TODO: need to take a handler from the request
+        user = request.user
+        handler = 'scorm_set_values'
+        response_context = {}
+
+        for course_data in request.data.get('courses_data'):
+            course_id = course_data.get('course_id')
+            response_context[course_id] = {}
+            try:
+                course_key = CourseKey.from_string(course_id)
+            except InvalidKeyError:
+                return Response({'error': '{} is not a valid course key'.format(course_id)},
+                                status=status.HTTP_404_NOT_FOUND)
+
+            with modulestore().bulk_operations(course_key):
+                try:
+                    course = modulestore().get_course(course_key)
+                except ItemNotFoundError:
+                    return Response({'error': '{} does not exist in the modulestore'.format(course_id)},
+                                    status=status.HTTP_404_NOT_FOUND)
+
+            for scorm in course_data.get('xblocks_data', []):
+                factory = RequestFactory()
+
+                scorm_request = factory.post(
+                    reverse('mobile_api_extensions:set_values'),
+                    json.dumps(scorm),
+                    content_type='application/json'
+                )
+                scorm_request.user = user
+                scorm_request.session = request.session
+                scorm_request.user.known = True
+
+                usage_id = scorm.get('usage_id')
+                scorm_response = _invoke_xblock_handler(scorm_request, course_id, usage_id, handler, None,
+                                                        course=course)
+                response_context[course_id][usage_id] = json.loads(scorm_response.content)
+        return Response(response_context)

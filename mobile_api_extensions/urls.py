@@ -14,10 +14,11 @@ from .api import (
     CourseListViewExtended,
     CourseProgressView,
     DeactivateLogoutViewExtended,
+    SyncXBlockData,
 )
 
 ROUTER = SimpleRouter()
-ROUTER.register("comments", CommentViewSetExtended, basename="comment-extended")
+ROUTER.register('comments', CommentViewSetExtended, basename='comment-extended')
 
 
 urlpatterns = [
@@ -31,12 +32,12 @@ urlpatterns = [
         'v1/blocks/',
         BlocksInCourseViewExtended.as_view(),
         kwargs={'hide_access_denials': True},
-        name="blocks_in_course"
+        name='blocks_in_course'
     ),
     path(
         'v2/blocks/',
         BlocksInCourseViewExtended.as_view(),
-        name="blocks_in_course"
+        name='blocks_in_course'
     ),
     re_path(
         r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
@@ -46,15 +47,18 @@ urlpatterns = [
     path(
         'courses/v1/courses/',
         CourseListViewExtended.as_view(),
-        name="course-list"
+        name='course-list'
     ),
     re_path(
         fr'^v1/courses/{settings.COURSE_KEY_PATTERN}$',
         CourseDetailViewExtended.as_view(),
-        name="course-detail"
+        name='course-detail'
     ),
     path(
         'user/v1/accounts/deactivate_logout/', DeactivateLogoutViewExtended.as_view(),
         name='deactivate_logout'
+    ),
+    re_path(
+        r'^set_values$', SyncXBlockData.as_view(), name='set_values'
     ),
 ]
