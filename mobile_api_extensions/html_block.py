@@ -12,7 +12,7 @@ from xmodule.exceptions import NotFoundError
 from xmodule.modulestore.exceptions import ItemNotFoundError
 
 
-class HtmlBlockMobileApiMixin(object):
+class HtmlBlockMobileApiMixin():
 
     FILE_NAME = 'content_html.zip'
 
@@ -27,7 +27,7 @@ class HtmlBlockMobileApiMixin(object):
             link = match.group()
             filename = link.split('/static/')[-1]
             self.save_asset_file(link, filename)
-            return 'assets/{}'.format(filename)
+            return f'assets/{filename}'
 
         def replace_iframe(data):
             soup = BeautifulSoup(data, 'html.parser')
@@ -44,12 +44,12 @@ class HtmlBlockMobileApiMixin(object):
         data = pattern.sub(replace_static_links, self.data)
         data = replace_iframe(data)
 
-        default_storage.save('{}index.html'.format(base_path), ContentFile(data))
+        default_storage.save(f'{base_path}index.html', ContentFile(data))
         self.create_zip_file(base_path)
 
     def remove_old_files(self, base_path):
         try:
-            directories, files = default_storage.listdir(base_path)
+            _, files = default_storage.listdir(base_path)
         except OSError:
             pass
         else:
@@ -57,7 +57,7 @@ class HtmlBlockMobileApiMixin(object):
                 default_storage.delete(base_path + file_name)
 
         try:
-            directories, files = default_storage.listdir(base_path + 'assets/')
+            _, files = default_storage.listdir(base_path + 'assets/')
         except OSError:
             pass
         else:
@@ -65,7 +65,7 @@ class HtmlBlockMobileApiMixin(object):
                 default_storage.delete(base_path + 'assets/' + file_name)
 
     def _base_storage_path(self):
-        return '{loc.org}/{loc.course}/{loc.block_type}/{loc.block_id}/'.format(loc=self.location)
+        return f'{self.location.org}/{self.location.course}/{self.location.block_type}/{self.location.block_id}/'
 
     def save_asset_file(self, path, filename):
         asset_key = StaticContent.get_asset_key_from_path(self.location.course_key, path)
@@ -82,7 +82,7 @@ class HtmlBlockMobileApiMixin(object):
         zf.write(default_storage.path(base_path + "index.html"), "index.html")
 
         try:
-            directories, files = default_storage.listdir(base_path + 'assets/')
+            _, files = default_storage.listdir(base_path + 'assets/')
         except OSError:
             pass
         else:
@@ -92,7 +92,7 @@ class HtmlBlockMobileApiMixin(object):
         zf.close()
 
     def is_modified(self):
-        file_path = '{}{}'.format(self._base_storage_path(), self.FILE_NAME)
+        file_path = f'{self._base_storage_path()}{self.FILE_NAME}'
 
         try:
             last_modified = default_storage.get_created_time(file_path)
@@ -102,7 +102,7 @@ class HtmlBlockMobileApiMixin(object):
         return self.published_on > last_modified
 
     def student_view_data(self):
-        file_path = '{}{}'.format(self._base_storage_path(), self.FILE_NAME)
+        file_path = f'{self._base_storage_path()}{self.FILE_NAME}'
 
         try:
             default_storage.get_created_time(file_path)
@@ -112,7 +112,7 @@ class HtmlBlockMobileApiMixin(object):
         html_data = default_storage.url(file_path)
 
         if not html_data.startswith('http'):
-            html_data = '{}{}'.format(settings.LMS_ROOT_URL, html_data)
+            html_data = f'{settings.LMS_ROOT_URL}{html_data}'
 
         last_modified = default_storage.get_created_time(file_path)
         size = default_storage.size(file_path)

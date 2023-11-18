@@ -4,7 +4,6 @@ from edx_django_utils.monitoring import function_trace
 from lms.djangoapps import branding
 from lms.djangoapps.courseware.access import has_access
 from lms.djangoapps.course_api.api import get_effective_user
-from lms.djangoapps.courseware.courses import get_courses
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.lib.api.view_utils import LazySequence
 
