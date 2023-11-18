@@ -1,4 +1,4 @@
-FROM python:3.8-slim as base-image
+FROM python:3.8-slim-bullseye as base-image
 
 ENV PYTHONUNBUFFERED 1
 RUN apt update -y && apt install make
