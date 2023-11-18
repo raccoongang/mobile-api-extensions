@@ -14,6 +14,11 @@ Unreleased
 
 *
 
-[0.0.0] - 2023-02-28
+[1.0.0] - 2023-11-18
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Added mobile SCORM overrides, for offline functionality
+* Transfer HTML xBlock offline experience for mobile 
 
+[0.0.0] - 2023-09-18
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Plugin initialization
