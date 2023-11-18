@@ -38,7 +38,8 @@ urlpatterns = [
         BlocksInCourseViewExtended.as_view(),
         name="blocks_in_course"
     ),
-    re_path(r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
+    re_path(
+        r'^v1/courses/{}/progress/$'.format(settings.COURSE_ID_PATTERN),
         ensure_valid_course_key(CourseProgressView.as_view()),
         name='api-course-progress'
     ),
@@ -47,7 +48,8 @@ urlpatterns = [
         CourseListViewExtended.as_view(),
         name="course-list"
     ),
-    re_path(fr'^v1/courses/{settings.COURSE_KEY_PATTERN}$',
+    re_path(
+        fr'^v1/courses/{settings.COURSE_KEY_PATTERN}$',
         CourseDetailViewExtended.as_view(),
         name="course-detail"
     ),

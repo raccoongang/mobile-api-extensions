@@ -58,7 +58,12 @@ class CourseProgressView(APIView):
                     total=total,
                     percentageString="{0:.0%}".format(section.percent_graded),
                     display_name=section.display_name,
-                    score=[{'earned': score.earned, 'possible': score.possible} for score in section.problem_scores.values()],
+                    score=[
+                        {
+                            'earned': score.earned,
+                            'possible': score.possible
+                        } for score in section.problem_scores.values()
+                    ],
                     show_grades=section.show_grades(staff_access),
                     graded=section.graded,
                     grade_type=section.format or '',
