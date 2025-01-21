@@ -8,6 +8,8 @@ from lms.djangoapps.courseware.courses import get_courses
 from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 from openedx.core.lib.api.view_utils import LazySequence
 
+from common.djangoapps.third_party_auth import is_enabled
+
 
 @function_trace('get_courses')
 def get_courses(user, org=None, filter_=None, permissions=None):
@@ -107,3 +109,16 @@ def list_courses(request,
     course_qs = get_courses(user, org=org, filter_=filter_, permissions=permissions)
     course_qs = _filter_by_search(course_qs, search_term)
     return course_qs
+
+
+def is_enabled_mobile():
+    """Check whether mobile third party authentication has been enabled. """
+
+    # We do this import internally to avoid initializing settings prematurely
+    from django.conf import settings as django_settings
+
+    return is_enabled() and configuration_helpers.get_value(
+        "ENABLE_MOBILE_THIRD_PARTY_AUTH",
+        django_settings.FEATURES.get("ENABLE_MOBILE_THIRD_PARTY_AUTH")
+    )
+

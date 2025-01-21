@@ -11,4 +11,5 @@ def plugin_settings(settings):
     Set of plugin settings used by the Open Edx platform.
     More info: https://github.com/edx/edx-platform/blob/master/openedx/core/djangoapps/plugins/README.rst
     """
-    pass
+    ENV_TOKENS = getattr(settings, 'ENV_TOKENS', {})
+    settings.MOBILE_SSO_DEEPLINK = ENV_TOKENS.get('MOBILE_SSO_DEEPLINK', 'openedx://sso')
