@@ -13,3 +13,4 @@ def plugin_settings(settings):
     """
     ENV_TOKENS = getattr(settings, 'ENV_TOKENS', {})
     settings.MOBILE_SSO_DEEPLINK = ENV_TOKENS.get('MOBILE_SSO_DEEPLINK', 'openedx://sso')
+    settings.FEATURES['ENABLE_MOBILE_THIRD_PARTY_AUTH'] = True

@@ -90,7 +90,6 @@ def mobile_do_complete(backend, login, user=None, redirect_name='next',  # pylin
 
     Add custom logic for mobile apps.
     """
-    print("=def mobile_do_complete(backend, login, user=None, redirect_name='next',  # pylint: disable=keyword-arg-before-vararg")
     is_authenticated = user_is_authenticated(user)
     user = user if is_authenticated else None
     mobile_auth_code = ""
@@ -143,7 +142,15 @@ def complete_mobile(request, backend, *args, **kwargs):
     """
     print("=def complete_mobile(request, backend, *args, **kwargs):")
     backend = request.backend
-    redirect_value = backend.strategy.session_get('deeplink_redirect', '')
+    redirect_value = backend.strategy.session_get('deeplink_redirect')
+
+    print("redirect_value")
+    print(redirect_value)
+    print('@@@@@ session_get')
+    print("Session ID:", request.session.session_key)
+    print("Session Data:", request.session.items())
+    print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
+
     if redirect_value:
         do_complete_view = mobile_do_complete
     else:
@@ -164,6 +171,14 @@ def auth_mobile(request, backend):
     redirect_value = request.backend.strategy.request_data().get(REDIRECT_FIELD_NAME, '')
     request.backend.strategy.session_set('deeplink_redirect',
                                          (redirect_value == settings.MOBILE_SSO_DEEPLINK))
+
+    print("request.backend.strategy.session_get('deeplink_redirect', '')")
+    print(request.backend.strategy.session_get('deeplink_redirect', ''))
+    print('---------------------------')
+    print('@@@@@ session_set')
+    print("Session ID:", request.session.session_key)
+    print("Session Data:", request.session.items())
+
     return do_auth(request.backend, redirect_name=REDIRECT_FIELD_NAME)
 
 
@@ -181,7 +196,6 @@ class AuthorizationCodeExchangeView(APIView):
         SAML authorization through SSO for mobile client
     """
     http_method_names = ['post']
-    #TODO check and change this for Saml
     dot_adapter = adapters.DOTAdapter()
 
     @method_decorator(csrf_exempt)
@@ -257,7 +271,6 @@ class AuthorizationCodeExchangeView(APIView):
 
 @api_view(["GET"])
 def redirect_to_mobile_deeplink(request):
-    print("=def redirect_to_mobile_deeplink(request):")
     """Redirect to mobile app SSO endpoint."""
     redirect_url = settings.MOBILE_SSO_DEEPLINK
     redirect_url += f"?AuthorizationCode={request.GET.get('AuthorizationCode')}&Status={request.GET.get('Status')}"
@@ -269,10 +282,18 @@ def redirect_to_mobile_deeplink(request):
 def redirect_to_mobile(request, backend_name):
     print("=def redirect_to_mobile(request, backend_name):")
     """Redirect to SSO login endpoint with next params."""
+
+    # TODO change variables
+    extra_params = {
+        REDIRECT_FIELD_NAME: settings.MOBILE_SSO_DEEPLINK,  # `next`
+        "auth_entry": "login",  # Обязательный параметр для входа
+        "idp": "keycloak"  # Укажите правильный ID провайдера
+    }
+
     redirect_url = pipeline._get_url(  # pylint: disable=protected-access
         'social_login_override',
         backend_name,
-        extra_params={REDIRECT_FIELD_NAME: settings.MOBILE_SSO_DEEPLINK}
+        extra_params=extra_params
     )
     return redirect(redirect_url)
 
@@ -285,12 +306,6 @@ def get_mobile_login_url(request, backend_name):
         raise Http404
 
     backend = backend_list[0]
-    print("=======================backend_list")
-    print(backend_list)
-    print('-----------------------------------')
-    print(backend)
-    print(dir(backend))
-    print('---------------------')
     backend_logout_url = f'{backend.get_setting("POOL_DOMAIN")}/logout'
     client_id = backend.get_setting('KEY')
     lms_root_url = configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
