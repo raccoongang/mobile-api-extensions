@@ -3,7 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.models import User
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -28,7 +28,6 @@ from common.djangoapps.student.models import UserProfile
 from common.djangoapps.student.views import compose_and_send_activation_email
 from common.djangoapps.third_party_auth import pipeline, provider
 from openedx.core.djangoapps.oauth_dispatch import adapters
-from openedx.core.djangoapps.site_configuration import helpers as configuration_helpers
 
 from .models import ExtraUserInfo
 from .forms import AuthorizationCodeExchangeForm
@@ -140,16 +139,8 @@ def complete_mobile(request, backend, *args, **kwargs):
 
     Redirect to mobile deeplink based on custom parameter stored in session.
     """
-    print("=def complete_mobile(request, backend, *args, **kwargs):")
     backend = request.backend
     redirect_value = backend.strategy.session_get('deeplink_redirect')
-
-    print("redirect_value")
-    print(redirect_value)
-    print('@@@@@ session_get')
-    print("Session ID:", request.session.session_key)
-    print("Session Data:", request.session.items())
-    print('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$')
 
     if redirect_value:
         do_complete_view = mobile_do_complete
@@ -167,17 +158,9 @@ def auth_mobile(request, backend):
 
     Set custom condition for mobile redirect to session.
     """
-    print("=def auth_mobile(request, backend):")
     redirect_value = request.backend.strategy.request_data().get(REDIRECT_FIELD_NAME, '')
     request.backend.strategy.session_set('deeplink_redirect',
                                          (redirect_value == settings.MOBILE_SSO_DEEPLINK))
-
-    print("request.backend.strategy.session_get('deeplink_redirect', '')")
-    print(request.backend.strategy.session_get('deeplink_redirect', ''))
-    print('---------------------------')
-    print('@@@@@ session_set')
-    print("Session ID:", request.session.session_key)
-    print("Session Data:", request.session.items())
 
     return do_auth(request.backend, redirect_name=REDIRECT_FIELD_NAME)
 
@@ -206,7 +189,6 @@ class AuthorizationCodeExchangeView(APIView):
         """
         Exchange Authorization code for access token.
         """
-        print("=def post(self, request, *args, **kwargs):")
         form = AuthorizationCodeExchangeForm(request=request, oauth2_adapter=self.dot_adapter, data=request.POST)
 
         if not form.is_valid():
@@ -280,15 +262,16 @@ def redirect_to_mobile_deeplink(request):
 
 
 def redirect_to_mobile(request, backend_name):
-    print("=def redirect_to_mobile(request, backend_name):")
     """Redirect to SSO login endpoint with next params."""
-
-    # TODO change variables
     extra_params = {
-        REDIRECT_FIELD_NAME: settings.MOBILE_SSO_DEEPLINK,  # `next`
-        "auth_entry": "login",  # Обязательный параметр для входа
-        "idp": "keycloak"  # Укажите правильный ID провайдера
+        REDIRECT_FIELD_NAME: settings.MOBILE_SSO_DEEPLINK,
     }
+
+    if backend_name == 'tpa-saml':
+        extra_params.update({
+            "auth_entry": "login",
+            "idp": request.GET.get("idp", "default")
+        })
 
     redirect_url = pipeline._get_url(  # pylint: disable=protected-access
         'social_login_override',
@@ -296,22 +279,4 @@ def redirect_to_mobile(request, backend_name):
         extra_params=extra_params
     )
     return redirect(redirect_url)
-
-
-def get_mobile_login_url(request, backend_name):
-    print("=def get_mobile_login_url(request, backend_name):")
-    """Generates a link for user authorization on the provider side."""
-    backend_list = list(provider.Registry.get_enabled_by_backend_name(backend_name))
-    if not backend_list:
-        raise Http404
-
-    backend = backend_list[0]
-    backend_logout_url = f'{backend.get_setting("POOL_DOMAIN")}/logout'
-    client_id = backend.get_setting('KEY')
-    lms_root_url = configuration_helpers.get_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
-    redirect_uri = f'{lms_root_url}{reverse("redirect-mobile", args=(backend_name,))}'
-    scope = 'openid+profile+email'
-    login_url = f'{backend_logout_url}?client_id={client_id}&redirect_uri={redirect_uri}' \
-                f'&response_type=code&scope={scope}'
-    return redirect(login_url)
 

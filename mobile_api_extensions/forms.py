@@ -24,7 +24,6 @@ class AuthorizationCodeExchangeForm(forms.Form):
         if 'client_id' not in self.errors:
             client_id = cleaned_data.get('client_id', '')
             try:
-                #TODO need_change for SAML
                 self.cleaned_data['client'] = self.oauth2_adapter.get_client(client_id=client_id)
             except Application.DoesNotExist:
                 self.add_error("client_id", _("Client id [{client_id}] does not exist.").format(client_id=client_id))
