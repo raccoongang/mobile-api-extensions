@@ -10,14 +10,14 @@ log = logging.getLogger(__name__)
 User = get_user_model()
 
 
-class ExtraUserInfo(models.Model):
+class MobileUserAuth(models.Model):
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='extra_user_info')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='mobile_user_auth')
     authorization_code = models.CharField(unique=True, null=True, blank=True, max_length=32)
 
     class Meta:
-        verbose_name = 'Extra User Info'
-        verbose_name_plural = 'Extra Users Info'
+        verbose_name = 'Mobile User Auth'
+        verbose_name_plural = 'Mobile Users Auth'
 
     @staticmethod
     def _generate_authorization_code():

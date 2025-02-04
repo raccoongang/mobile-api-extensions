@@ -31,7 +31,7 @@ class AuthorizationCodeExchangeForm(forms.Form):
         if 'authorization_code' not in self.errors:
             authorization_code = cleaned_data.get('authorization_code', '')
             try:
-                self.cleaned_data['user'] = User.objects.get(extra_user_info__authorization_code=authorization_code)
+                self.cleaned_data['user'] = User.objects.get(mobile_user_auth__authorization_code=authorization_code)
             except User.DoesNotExist:
                 self.add_error(
                     "authorization_code",

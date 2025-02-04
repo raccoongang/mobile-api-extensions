@@ -29,8 +29,9 @@ from common.djangoapps.student.views import compose_and_send_activation_email
 from common.djangoapps.third_party_auth import pipeline, provider
 from openedx.core.djangoapps.oauth_dispatch import adapters
 
-from .models import ExtraUserInfo
+from .models import MobileUserAuth
 from .forms import AuthorizationCodeExchangeForm
+from .utils import build_mobile_auth_url
 
 log = logging.getLogger(__name__)
 
@@ -51,8 +52,8 @@ def _populate_authorization_code(user):
     token = None
 
     if user:
-        extrauserinfo, created = ExtraUserInfo.objects.get_or_create(user=user)
-        token = extrauserinfo.set_authorization_code()
+        mobile_user_auth, created = MobileUserAuth.objects.get_or_create(user=user)
+        token = mobile_user_auth.set_authorization_code()
 
     return token
 
@@ -126,7 +127,7 @@ def mobile_do_complete(backend, login, user=None, redirect_name='next',  # pylin
 
     if mobile_auth_code:
         url = reverse('sso-deeplink')
-    url += (('&' if '?' in url else '?') + f'AuthorizationCode={mobile_auth_code}&Status={mobile_status_message}')
+    url = build_mobile_auth_url(url, mobile_auth_code, mobile_status_message)
 
     return backend.strategy.redirect(url)
 
@@ -238,10 +239,10 @@ class AuthorizationCodeExchangeView(APIView):
         Set requested authorization_code to None
 
         Args:
-            authorization_code (str): UserProfile.authorization_code
+            authorization_code (str): MobileUserAuth.authorization_code
         """
-        user = User.objects.get(extra_user_info__authorization_code=authorization_code)
-        user.extra_user_info.authorization_code = None
+        user = User.objects.get(mobile_user_auth__authorization_code=authorization_code)
+        user.mobile_user_auth.authorization_code = None
         user.save()
 
     def error_response(self, form_errors, **kwargs):
@@ -254,8 +255,8 @@ class AuthorizationCodeExchangeView(APIView):
 @api_view(["GET"])
 def redirect_to_mobile_deeplink(request):
     """Redirect to mobile app SSO endpoint."""
-    redirect_url = settings.MOBILE_SSO_DEEPLINK
-    redirect_url += f"?AuthorizationCode={request.GET.get('AuthorizationCode')}&Status={request.GET.get('Status')}"
+
+    redirect_url = build_mobile_auth_url(settings.MOBILE_SSO_DEEPLINK, request.GET.get('AuthorizationCode'), request.GET.get('Status'))
     response = HttpResponse(redirect_url, status=302)
     response['Location'] = redirect_url
     return response
